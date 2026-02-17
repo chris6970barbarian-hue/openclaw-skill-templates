@@ -30,6 +30,8 @@ const MATCH_THRESHOLD = 0.3; // 30% similarity threshold
 // Known skills with detailed descriptions
 const SKILL_DATABASE = [
   { name: 'homeassistant', desc: 'Control smart home devices like lights switches thermostats via Home Assistant API', keywords: ['home', 'assistant', 'smart', 'homeassistant', 'ha', 'light', 'switch', 'thermostat', 'iot', 'automation'] },
+  { name: 'skillstore', desc: 'Search install and create OpenClaw skills with intelligent matching semantic search threshold filtering', keywords: ['skill', 'store', 'openclaw', 'install', 'search', 'create', 'template', 'manager'] },
+  { name: 'openclaw-migrate', desc: 'Migrate OpenClaw from one host to another via SSH sync config skills memory tokens', keywords: ['migrate', 'openclaw', 'ssh', 'sync', 'migration', 'transfer', 'backup'] },
   { name: 'openhue', desc: 'Control Philips Hue lights and scenes', keywords: ['hue', 'philips', 'light', 'bulb', 'scene'] },
   { name: 'blucli', desc: 'Control BluOS speakers and streaming devices', keywords: ['bluos', 'speaker', 'audio', 'music', 'streaming', 'bluetooth'] },
   { name: 'sonoscli', desc: 'Control Sonos speakers and groups', keywords: ['sonos', 'speaker', 'audio', 'music', 'streaming'] },
