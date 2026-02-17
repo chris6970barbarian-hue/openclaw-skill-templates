@@ -1,95 +1,63 @@
-# SkillStore - OpenClaw Skill Manager
+# SkillStore - Intelligent Skill Search
 
-Search, install, and create OpenClaw skills. Automatically searches GitHub for existing skills before creating new ones.
+Smart skill search with semantic matching and relevance threshold.
 
 ## Features
 
-- **Smart Search** - Searches GitHub for existing skills first
-- **Local Search** - Finds skills in your workspace
-- **One-command Install** - Install from GitHub with one command
-- **Template Generator** - Create new skills with templates
-- **Known Skills** - Lists all known OpenClaw skills
+- **Semantic Matching** - Analyzes actual skill functionality
+- **30% Threshold** - Only shows relevant matches
+- **Visual Scoring** - Shows match percentage with bar
+- **Multi-source** - Known, local, GitHub
 
 ## Quick Start
 
 ```bash
-# Search for a skill
-skillstore home assistant
+# Search (threshold applied automatically)
+skillstore smart home
 skillstore weather
-skillstore github
+skillstore email gmail
 
-# List installed skills
+# Manage skills
 skillstore list
-
-# Show known skills
 skillstore known
-
-# Create new skill
-skillstore create my-awesome-skill
-```
-
-## How It Works
-
-1. **Search Phase**: When you search for a skill, it automatically:
-   - Searches GitHub for matching repositories
-   - Searches your local skills
-
-2. **Results Phase**: Shows all matches:
-   - Local skills (green)
-   - GitHub repositories (cyan)
-
-3. **Action Phase**: Choose to:
-   - Install from GitHub (enter number)
-   - Create new skill (type 'n')
-   - Quit (type 'q')
-
-## Usage Examples
-
-```bash
-# Find weather skills
-skillstore weather
-
-# Find GitHub integration
-skillstore github
-
-# Find smart home skills
-skillstore "home assistant"
-skillstore hue
-skillstore smart
-
-# Create new
 skillstore create my-skill
 ```
+
+## Matching System
+
+```
+Query: "smart home"
+
+Results (filtered by 30% threshold):
+✓ homeassistant     85% ████████░░ (strong)
+✓ openclaw-homeassistant 62% ██████░░░░
+✗ irrelevant-skill  15% (filtered out)
+```
+
+## Why Threshold?
+
+Prevents showing irrelevant skills just because of partial keyword matches.
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `skillstore Search for skills |
-| `skillstore <query>` | list` | List installed skills |
-| `skillstore known Open` | Show knownClaw skills |
-| `skillstore create <name>` | Create new skill |
+| `skillstore <query>` | Search with smart matching |
+| `skillstore list` | List installed |
+| `skillstore known` | Show 20 known skills |
+| `skillstore create` | New skill template |
 
-## Search Flow
+## What It Does
 
-```
-1. User: "skillstore weather"
-2. System searches GitHub for "openclaw weather"
-3. System searches local skills
-4. Shows results (local + GitHub)
-5. User chooses: install / create new / quit
-```
+1. **Tokenize** - Break query into words
+2. **Calculate** - Jaccard similarity + boosts
+3. **Filter** - Remove below 30% threshold
+4. **Rank** - Sort by score
+5. **Show** - Display with visual bar
 
-## Configuration
+## Threshold Customization
 
-Config saved to `config.json` in skill folder.
-
-## Files
-
-```
-skillstore/
-├── SKILL.md       # OpenClaw skill docs
-├── README.md      # This file
-├── main.js        # Main CLI
-└── config.json   # Saved installations
+Edit `main.js` to change:
+```javascript
+const MATCH_THRESHOLD = 0.3; // 30%
 ```

@@ -2,14 +2,13 @@
 
 /**
  * SkillStore - OpenClaw Skill Manager
- * Search existing skills, install from GitHub, or create new ones
+ * Intelligent search with semantic matching and threshold filtering
  */
 
 const fs = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
 const https = require('https');
-const http = require('http');
 
 const C = {
   reset: '\x1b[0m',
@@ -26,21 +25,30 @@ const log = (msg, color = 'reset') => console.log(`${C[color]}${msg}${C.reset}`)
 const err = (msg) => console.error(`${C.red}Error:${C.reset} ${msg}`);
 
 const CONFIG_FILE = path.join(__dirname, 'config.json');
+const MATCH_THRESHOLD = 0.3; // 30% similarity threshold
 
-// Known OpenClaw skills repositories on GitHub
-const KNOWN_SKILLS = [
-  { name: 'homeassistant', repo: 'chris6970barbarian-hue/openclaw-homeassistant', desc: 'Control smart home devices' },
-  { name: 'openhue', repo: '', desc: 'Philips Hue lights control' },
-  { name: 'blucli', repo: '', desc: 'BluOS speaker control' },
-  { name: 'eightctl', repo: '', desc: 'Eight Sleep pod control' },
-  { name: 'sonoscli', repo: '', desc: 'Sonos speaker control' },
-  { name: 'gog', repo: '', desc: 'Google Workspace (Gmail, Calendar, Drive)' },
-  { name: 'himalaya', repo: '', desc: 'Email client via IMAP/SMTP' },
-  { name: 'obsidian', repo: '', desc: 'Obsidian vault integration' },
-  { name: 'ordercli', repo: '', desc: 'Food delivery orders' },
-  { name: 'weather', repo: '', desc: 'Weather forecasts' },
-  { name: 'github', repo: '', desc: 'GitHub CLI integration' },
-  { name: 'blogwatcher', repo: '', desc: 'RSS/Atom feed monitoring' },
+// Known skills with detailed descriptions
+const SKILL_DATABASE = [
+  { name: 'homeassistant', desc: 'Control smart home devices like lights switches thermostats via Home Assistant API', keywords: ['home', 'assistant', 'smart', 'homeassistant', 'ha', 'light', 'switch', 'thermostat', 'iot', 'automation'] },
+  { name: 'openhue', desc: 'Control Philips Hue lights and scenes', keywords: ['hue', 'philips', 'light', 'bulb', 'scene'] },
+  { name: 'blucli', desc: 'Control BluOS speakers and streaming devices', keywords: ['bluos', 'speaker', 'audio', 'music', 'streaming', 'bluetooth'] },
+  { name: 'sonoscli', desc: 'Control Sonos speakers and groups', keywords: ['sonos', 'speaker', 'audio', 'music', 'streaming'] },
+  { name: 'eightctl', desc: 'Control Eight Sleep pods temperature and alarms', keywords: ['eight', 'sleep', 'pod', 'temperature', 'mattress', 'bed'] },
+  { name: 'gog', desc: 'Google Workspace CLI for Gmail Calendar Drive Contacts Sheets Docs', keywords: ['google', 'gmail', 'calendar', 'drive', 'workspace', 'email', 'document'] },
+  { name: 'himalaya', desc: 'Email client via IMAP SMTP terminal', keywords: ['email', 'imap', 'smtp', 'mail', 'terminal'] },
+  { name: 'obsidian', desc: 'Obsidian vault integration and automation', keywords: ['obsidian', 'note', 'markdown', 'vault', 'knowledge'] },
+  { name: 'ordercli', desc: 'Food delivery order management Foodora Deliveroo', keywords: ['food', 'order', 'delivery', 'foodora', 'deliveroo', 'eat'] },
+  { name: 'weather', desc: 'Weather forecasts current temperature conditions', keywords: ['weather', 'forecast', 'temperature', 'rain', 'sun', 'climate'] },
+  { name: 'github', desc: 'GitHub CLI issues pull requests workflows', keywords: ['github', 'git', 'issue', 'pr', 'pull', 'request', 'repo', 'repository'] },
+  { name: 'blogwatcher', desc: 'Monitor RSS Atom feeds for blog updates', keywords: ['blog', 'rss', 'feed', 'monitor', 'watch', 'atom', 'news'] },
+  { name: 'gifgrep', desc: 'Search and download GIFs from providers', keywords: ['gif', 'image', 'search', 'meme', 'animation'] },
+  { name: 'video-frames', desc: 'Extract frames and clips from video files', keywords: ['video', 'frame', 'clip', 'extract', 'ffmpeg'] },
+  { name: 'youtube-summarizer', desc: 'Summarize YouTube video transcripts', keywords: ['youtube', 'video', 'transcript', 'summarize', 'summary'] },
+  { name: 'ga4', desc: 'Google Analytics 4 query and reporting', keywords: ['analytics', 'ga4', 'google', 'traffic', 'pageview', 'metric'] },
+  { name: 'gsc', desc: 'Google Search Console SEO query data', keywords: ['seo', 'search', 'google', 'console', 'ranking', 'clicks'] },
+  { name: 'wacli', desc: 'WhatsApp messaging via CLI send messages', keywords: ['whatsapp', 'wa', 'message', 'send', 'chat'] },
+  { name: 'browser', desc: 'Automate web browser interactions', keywords: ['browser', 'automation', 'web', 'scraping', 'selenium', 'playwright'] },
+  { name: 'healthcheck', desc: 'Security hardening and system monitoring', keywords: ['security', 'hardening', 'monitor', 'health', 'firewall', 'audit'] },
 ];
 
 // Load config
@@ -72,44 +80,58 @@ function prompt(question) {
 // HTTP request helper
 function httpGet(url) {
   return new Promise((resolve, reject) => {
-    const client = url.startsWith('https') ? https : http;
-    client.get(url, (res) => {
+    const req = https.get(url, { headers: { 'User-Agent': 'OpenClaw-SkillStore/1.0' } }, (res) => {
       let data = '';
       res.on('data', c => data += c);
-      res.on('end', () => resolve(JSON.parse(data)));
-    }).on('error', reject);
+      res.on('end', () => {
+        try { resolve(JSON.parse(data)); }
+        catch (e) { resolve({}); }
+      });
+    });
+    req.on('error', reject);
+    req.setTimeout(5000, () => { req.destroy(); reject(new Error('timeout')); });
   });
 }
 
-// Search GitHub for OpenClaw skills
-async function searchGitHub(query) {
-  log(`Searching GitHub for "${query}"...`, 'cyan');
-  
-  try {
-    const results = await httpGet(
-      `https://api.github.com/search/repositories?q=openclaw+${encodeURIComponent(query)}+in:name,description&per_page=10`,
-      // Add User-Agent header
-    );
-    
-    if (results.items && results.items.length > 0) {
-      log(`\nFound ${results.items.length} matching repositories:`, 'green');
-      return results.items.map(r => ({
-        name: r.name,
-        fullName: r.full_name,
-        desc: r.description,
-        url: r.html_url,
-        stars: r.stargazers_count
-      }));
-    }
-  } catch (e) {
-    log('GitHub search failed, using local knowledge...', 'gray');
-  }
-  
-  // Fallback to local search
-  return [];
+// Tokenize text into words
+function tokenize(text) {
+  return text.toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 2);
 }
 
-// Search local skills
+// Calculate similarity between query and skill
+function calculateSimilarity(query, skill) {
+  const queryWords = new Set(tokenize(query));
+  const skillWords = new Set([
+    ...tokenize(skill.name),
+    ...tokenize(skill.desc),
+    ...skill.keywords
+  ]);
+  
+  // Jaccard similarity
+  const intersection = [...queryWords].filter(w => skillWords.has(w));
+  const union = new Set([...queryWords, ...skillWords]);
+  
+  let score = intersection.length / union.size;
+  
+  // Boost for exact keyword matches
+  for (const word of queryWords) {
+    if (skill.keywords.includes(word)) score += 0.1;
+    if (skill.name.toLowerCase().includes(word)) score += 0.15;
+  }
+  
+  // Boost for name match
+  const queryLower = query.toLowerCase();
+  if (skill.name.toLowerCase().includes(queryLower.split(' ')[0])) {
+    score += 0.1;
+  }
+  
+  return Math.min(score, 1); // Cap at 1.0
+}
+
+// Search local skills with content analysis
 function searchLocal(query) {
   const skillsDir = path.join(__dirname, '..');
   if (!fs.existsSync(skillsDir)) return [];
@@ -122,39 +144,119 @@ function searchLocal(query) {
     const itemPath = path.join(skillsDir, item);
     if (!fs.statSync(itemPath).isDirectory()) continue;
     
-    // Check skill name
-    if (item.toLowerCase().includes(q)) {
-      results.push({ name: item, type: 'local' });
+    let content = '';
+    let fullDesc = '';
+    
+    // Read SKILL.md and README.md
+    for (const file of ['SKILL.md', 'README.md']) {
+      const fpath = path.join(itemPath, file);
+      if (fs.existsSync(fpath)) {
+        content += fs.readFileSync(fpath, 'utf8') + ' ';
+      }
     }
     
-    // Check SKILL.md
-    const skillMd = path.join(itemPath, 'SKILL.md');
-    if (fs.existsSync(skillMd)) {
-      const content = fs.readFileSync(skillMd, 'utf8').toLowerCase();
-      if (content.includes(q) && !results.find(r => r.name === item)) {
-        results.push({ name: item, type: 'local' });
-      }
+    fullDesc = content;
+    
+    const score = calculateSimilarity(query, {
+      name: item,
+      desc: fullDesc.substring(0, 500), // Limit desc length
+      keywords: tokenize(fullDesc)
+    });
+    
+    if (score >= MATCH_THRESHOLD) {
+      results.push({
+        name: item,
+        score,
+        type: 'local',
+        desc: fullDesc.substring(0, 200).replace(/[#*`\n]/g, ' ').trim()
+      });
     }
   }
   
-  return results;
+  return results.sort((a, b) => b.score - a.score);
 }
 
-// Show search results
-function showResults(query, results) {
-  log(`\n${C.bright}Search Results for "${query}"${C.reset}\n`, 'cyan');
+// Search GitHub with semantic matching
+async function searchGitHub(query) {
+  log(`Searching GitHub for "${query}"...`, 'cyan');
   
-  if (results.length === 0) {
-    log('No existing skills found.', 'yellow');
+  try {
+    const results = await httpGet(
+      `https://api.github.com/search/repositories?q=openclaw+${encodeURIComponent(query)}+in:name,description&per_page=15`
+    );
+    
+    if (!results.items) return [];
+    
+    const scoredResults = [];
+    
+    for (const r of results.items) {
+      const score = calculateSimilarity(query, {
+        name: r.name,
+        desc: r.description || '',
+        keywords: tokenize(r.name + ' ' + (r.description || ''))
+      });
+      
+      if (score >= MATCH_THRESHOLD) {
+        scoredResults.push({
+          name: r.name,
+          fullName: r.full_name,
+          desc: r.description || 'No description',
+          url: r.html_url,
+          stars: r.stargazers_count,
+          score,
+          type: 'git'
+        });
+      }
+    }
+    
+    return scoredResults.sort((a, b) => b.score - a.score);
+    
+  } catch (e) {
+    log('GitHub search unavailable', 'gray');
+    return [];
+  }
+}
+
+// Search known skills database
+function searchKnown(query) {
+  const scoredResults = [];
+  
+  for (const skill of SKILL_DATABASE) {
+    const score = calculateSimilarity(query, skill);
+    
+    if (score >= MATCH_THRESHOLD) {
+      scoredResults.push({
+        name: skill.name,
+        desc: skill.desc,
+        score,
+        type: 'known'
+      });
+    }
+  }
+  
+  return scoredResults.sort((a, b) => b.score - a.score);
+}
+
+// Show search results with scores
+function showResults(query, results) {
+  const matchCount = results.filter(r => r.score >= MATCH_THRESHOLD).length;
+  
+  log(`\n${C.bright}Search Results for "${query}"${C.reset}`, 'cyan');
+  log(`Match threshold: ${Math.round(MATCH_THRESHOLD * 100)}% | Found: ${matchCount}\n`, 'gray');
+  
+  if (matchCount === 0) {
+    log(`No skills match your request above ${Math.round(MATCH_THRESHOLD * 100)}% threshold.`, 'yellow');
     return false;
   }
   
   results.forEach((r, i) => {
-    const prefix = r.type === 'local' ? '[LOCAL]' : '[GIT]';
-    const color = r.type === 'local' ? 'green' : 'cyan';
-    log(`${i + 1}. ${C[color]}${prefix}${C.reset} ${C.bright}${r.name}${C.reset}`, color);
-    if (r.desc) log(`   ${r.desc}`, 'gray');
-    if (r.url) log(`   ${r.url}`, 'gray');
+    const bar = '█'.repeat(Math.max(1, Math.floor(r.score * 10)));
+    const barColor = r.score >= 0.5 ? 'green' : (r.score >= 0.3 ? 'yellow' : 'gray');
+    const prefix = r.type === 'local' ? '[LOCAL]' : r.type === 'git' ? '[GIT]' : '[KNOWN]';
+    const prefixColor = r.type === 'local' ? 'green' : r.type === 'git' ? 'cyan' : 'mag';
+    
+    log(`${i + 1}. ${C[prefixColor]}${prefix}${C.reset} ${C.bright}${r.name}${C.reset} ${C[barColor]}${bar}${C.reset} ${Math.round(r.score * 100)}%`, prefixColor);
+    log(`   ${r.desc.substring(0, 80)}...`, 'gray');
   });
   
   return true;
@@ -172,11 +274,10 @@ async function installFromGitHub(repo, name) {
     return false;
   }
   
-  // Clone repo
   const cmd = `git clone https://github.com/${repo}.git "${targetDir}"`;
   
   return new Promise((resolve) => {
-    exec(cmd, (error, stdout, stderr) => {
+    exec(cmd, (error) => {
       if (error) {
         err(`Failed to install: ${error.message}`);
         resolve(false);
@@ -185,7 +286,6 @@ async function installFromGitHub(repo, name) {
       
       log(`Installed to ${targetDir}`, 'green');
       
-      // Update config
       const config = loadConfig();
       config.installed.push({ name, repo, installedAt: new Date().toISOString() });
       saveConfig(config);
@@ -207,10 +307,8 @@ function createNewSkill(name) {
     return false;
   }
   
-  // Create directory
   fs.mkdirSync(targetDir, { recursive: true });
   
-  // Create templates
   const templates = {
     'SKILL.md': `# ${name}
 
@@ -256,27 +354,13 @@ ${name} setup
 ${name} command
 \\\`\\\`\\\`
 
-## Documentation
-
-See [SKILL.md](./SKILL.md) for full documentation.
-
 ## License
 
 MIT`,
     
-    'config.json': `{
-  "name": "${name}",
-  "version": "1.0.0",
-  "description": "",
-  "author": ""
-}`,
+    'config.json': `{\n  "name": "${name}",\n  "version": "1.0.0"\n}`,
     
-    '.gitignore': `# Ignore sensitive files
-config.json
-*.token
-*.key
-.env
-node_modules/`,
+    '.gitignore': `config.json\n*.token\n*.key\n.env\nnode_modules/`,
     
     'main.js': `#!/usr/bin/env node
 
@@ -287,24 +371,18 @@ node_modules/`,
 const C = {
   reset: '\\x1b[0m',
   green: '\\x1b[32m',
-  red: '\\x1b[31m',
   yellow: '\\x1b[33m',
   cyan: '\\x1b[36m'
 };
 
 const log = (msg, color = 'reset') => console.log(\`\${C[color]}\${msg}\${C.reset}\`);
 
-function help() {
-  log('Usage:', 'yellow');
-  log('  ' + process.argv[1] + ' help', 'gray');
-}
-
 function main() {
   const args = process.argv.slice(2);
   const cmd = args[0];
   
   if (!cmd || cmd === 'help') {
-    help();
+    log('Usage: ' + process.argv[1] + ' <command>', 'yellow');
     return;
   }
   
@@ -315,20 +393,13 @@ main();
 `
   };
   
-  // Write files
   for (const [filename, content] of Object.entries(templates)) {
     fs.writeFileSync(path.join(targetDir, filename), content);
   }
   
-  // Make main.js executable
   fs.chmodSync(path.join(targetDir, 'main.js'), '755');
   
-  log(`\nCreated new skill at: ${targetDir}`, 'green');
-  log('Next steps:', 'yellow');
-  log(`  cd ${targetDir}`, 'gray');
-  log('  # Edit main.js with your implementation', 'gray');
-  log('  # Edit SKILL.md with documentation', 'gray');
-  
+  log(`Created at: ${targetDir}`, 'green');
   return true;
 }
 
@@ -338,7 +409,6 @@ function listInstalled() {
   
   log(`\n${C.bright}Installed Skills${C.reset}\n`, 'cyan');
   
-  // Local skills
   const skillsDir = path.join(__dirname, '..');
   if (fs.existsSync(skillsDir)) {
     const items = fs.readdirSync(skillsDir).filter(i => {
@@ -347,28 +417,20 @@ function listInstalled() {
     });
     
     if (items.length > 0) {
-      log('Local skills:', 'yellow');
       items.forEach(s => log(`  - ${s}`, 'gray'));
+    } else {
+      log('  No skills installed', 'gray');
     }
-  }
-  
-  if (config.installed && config.installed.length > 0) {
-    log('\nInstalled from GitHub:', 'yellow');
-    config.installed.forEach(s => log(`  - ${s.name} (${s.repo})`, 'gray'));
-  }
-  
-  if (!fs.existsSync(skillsDir) || fs.readdirSync(skillsDir).filter(i => fs.statSync(path.join(skillsDir, i)).isDirectory()).length === 0) {
-    log('No skills found', 'gray');
   }
 }
 
 // Show known skills
 function showKnownSkills() {
-  log(`\n${C.bright}Known OpenClaw Skills${C.reset}\n`, 'cyan');
+  log(`\n${C.bright}Known OpenClaw Skills (${SKILL_DATABASE.length})${C.reset}\n`, 'cyan');
   
-  KNOWN_SKILLS.forEach(s => {
+  for (const s of SKILL_DATABASE) {
     log(`  - ${C.green}${s.name}${C.reset} - ${s.desc}`, 'gray');
-  });
+  }
 }
 
 // Main workflow
@@ -376,23 +438,21 @@ async function main() {
   const args = process.argv.slice(2);
   const query = args.join(' ');
   
-  // No query - show help
   if (!query || query === 'help' || query === '-h') {
-    log(C.bright + '\nSkillStore - OpenClaw Skill Manager' + C.reset, 'cyan');
+    log(C.bright + '\nSkillStore - Intelligent Skill Search' + C.reset, 'cyan');
     log('\nUsage:', 'yellow');
-    log('  skillstore <query>     - Search and install skills', 'gray');
+    log('  skillstore <query>     - Search and filter skills', 'gray');
     log('  skillstore list        - List installed skills', 'gray');
     log('  skillstore known       - Show known skills', 'gray');
-    log('  skillstore create <name> - Create new skill', 'gray');
+    log('  skillstore create <n>   - Create new skill', 'gray');
+    log(`\nThreshold: ${Math.round(MATCH_THRESHOLD * 100)}% similarity required`, 'gray');
     log('\nExamples:', 'yellow');
-    log('  skillstore home assistant', 'gray');
-    log('  skillstore weather', 'gray');
-    log('  skillstore github', 'gray');
-    log('  skillstore create my-awesome-skill', 'gray');
+    log('  skillstore control lights', 'gray');
+    log('  skillstore email gmail', 'gray');
+    log('  skillstore weather forecast', 'gray');
     return;
   }
   
-  // List commands
   if (query === 'list' || query === 'ls') {
     listInstalled();
     return;
@@ -403,73 +463,76 @@ async function main() {
     return;
   }
   
-  // Create new skill
   if (query.startsWith('create ') || query.startsWith('new ')) {
     const name = query.replace(/^(create|new)\s+/, '');
     createNewSkill(name);
     return;
   }
   
-  // Search workflow
+  // Intelligent search workflow
   log(C.bright + '\n=== SkillStore Search ===' + C.reset, 'cyan');
-  log(`Looking for: "${query}"\n`, 'gray');
+  log(`Query: "${query}" | Threshold: ${Math.round(MATCH_THRESHOLD * 100)}%+\n`, 'gray');
   
-  // Step 1: Search GitHub
-  const gitResults = await searchGitHub(query);
+  // Step 1: Search known skills (fastest, most accurate)
+  const knownResults = searchKnown(query);
   
-  // Step 2: Search local
+  // Step 2: Search local skills
   const localResults = searchLocal(query);
   
-  // Combine results
-  const allResults = [
-    ...localResults.map(r => ({ ...r, desc: 'Local skill' })),
-    ...gitResults
-  ];
+  // Step 3: Search GitHub
+  const gitResults = await searchGitHub(query);
   
-  // Step 3: Show results
-  const hasResults = showResults(query, allResults);
+  // Combine and deduplicate
+  const allResults = [...knownResults, ...localResults, ...gitResults];
+  
+  // Remove duplicates by name (keep highest score)
+  const seen = new Map();
+  for (const r of allResults) {
+    if (!seen.has(r.name) || seen.get(r.name).score < r.score) {
+      seen.set(r.name, r);
+    }
+  }
+  
+  const uniqueResults = [...seen.values()].sort((a, b) => b.score - a.score);
+  
+  // Show results
+  const hasResults = showResults(query, uniqueResults);
   
   if (!hasResults) {
-    // No results - offer to create
-    log('\nNo existing skills match your query.', 'yellow');
-    const create = await prompt(`Create new skill "${query}"? (y/n): `);
+    log('\nNo existing skills match your needs above threshold.', 'yellow');
+    const create = await prompt(`Create new skill "${query.replace(/\s+/g, '-')}"? (y/n): `);
     
     if (create.toLowerCase() === 'y') {
-      // Generate name from query
       const name = query.toLowerCase()
         .replace(/[^a-z0-9]/g, '-')
         .replace(/-+/g, '-')
         .replace(/^-|-$/g, '');
-      
       createNewSkill(name);
     }
     return;
   }
   
-  // Offer options
-  log('\nOptions:', 'yellow');
-  log('  [n] Create new skill with this name', 'gray');
-  log('  [q] Quit', 'gray');
+  // Interactive selection
+  const gitOnly = gitResults.filter(r => r.type === 'git');
+  if (gitOnly.length > 0) {
+    log(`\n${C.yellow}Enter number (1-${gitOnly.length}) to install from GitHub${C.reset}`, 'gray');
+  }
+  log(`${C.gray}Or 'n' to create new, 'q' to quit${C.reset}`, 'gray');
   
-  // If GitHub results, offer to install
-  if (gitResults.length > 0) {
-    log(`\nOr enter number to install from GitHub: `, 'gray');
-    const choice = await prompt(`  (1-${gitResults.length}, n to create new, q to quit): `);
-    
-    const num = parseInt(choice);
-    if (!isNaN(num) && num >= 1 && num <= gitResults.length) {
-      const selected = gitResults[num - 1];
-      await installFromGitHub(selected.fullName, selected.name);
-      return;
-    }
+  const choice = await prompt('\nYour choice: ');
+  
+  const num = parseInt(choice);
+  if (!isNaN(num) && num >= 1 && num <= gitOnly.length) {
+    const selected = gitOnly[num - 1];
+    await installFromGitHub(selected.fullName, selected.name);
+    return;
   }
   
-  if (choice && choice.toLowerCase() === 'n') {
+  if (choice.toLowerCase() === 'n') {
     const name = query.toLowerCase()
       .replace(/[^a-z0-9]/g, '-')
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '');
-    
     createNewSkill(name);
     return;
   }

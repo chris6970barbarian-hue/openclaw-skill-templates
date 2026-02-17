@@ -1,87 +1,82 @@
-# SkillStore - OpenClaw Skill Manager
+# SkillStore - Intelligent OpenClaw Skill Manager
 
-Search, install, and create OpenClaw skills with one command.
+Smart skill search with semantic matching and relevance threshold filtering.
 
 ## Features
 
-- Smart GitHub search before creating new skills
-- One-command install from GitHub
-- Local skill search
-- Template-based skill creation
-- Known skills catalog
+- **Semantic Matching** - Analyzes actual skill functionality, not just keywords
+- **Relevance Threshold** - Only shows skills with 30%+ match score
+- **Multi-source Search** - Known skills, local skills, GitHub repos
+- **Scoring System** - Shows match percentage with visual bar
+
+## How It Works
+
+### Matching Algorithm
+
+1. **Tokenization** - Breaks query into keywords
+2. **Jaccard Similarity** - Measures word overlap
+3. **Keyword Boost** - Extra points for exact keyword matches
+4. **Name Boost** - Extra points for name matches
+5. **Threshold Filter** - Only shows scores >= 30%
+
+### Match Threshold
+
+```
+Score >= 50% = Strong match (green bar)
+Score >= 30% = Weak match (yellow bar)
+Score < 30% = Not shown
+```
 
 ## Quick Start
 
 ```bash
-# Search and install
-skillstore home assistant
-skillstore weather
+# Search with threshold filtering
+skillstore smart home
+skillstore weather forecast
+skillstore email gmail
 
-# List skills
+# List / Known
 skillstore list
 skillstore known
-
-# Create new
 skillstore create my-skill
 ```
 
-## Workflow
+## Search Example
 
-### 1. Search
-```bash
-skillstore home assistant
+```
+$ skillstore smart home
+
+Search Results for "smart home"
+Match threshold: 30% | Found: 3
+
+1. [KNOWN] homeassistant ████████░░ 85% (STRONG)
+   Control smart home devices like lights switches...
+2. [LOCAL] homeassistant ███████░░░ 78%
+   Home Assistant skill for OpenClaw
+3. [GIT] openclaw-homeassistant ██████░░░░ 62%
+   Control smart home devices
+
+Enter number to install or 'n' to create new
 ```
 
-Automatically:
-- Searches GitHub for "openclaw home assistant"
-- Searches local workspace
+## Why Threshold?
 
-### 2. Choose Action
-```
-Results:
-1. [GIT] openclaw-homeassistant - Control smart home devices
-2. [LOCAL] homeassistant - Your local version
-
-Options:
-  [1] Install from GitHub
-  [n] Create new skill
-  [q] Quit
-```
-
-### 3. Install or Create
-
-- **Install**: Downloads from GitHub to your skills folder
-- **Create**: Generates templates in new folder
+Prevents irrelevant results. A skill named "weather" won't show up for "email" just because it has some matching letters.
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `skillstore <query>` | Search for skills |
+| `skillstore <query>` | Search with threshold |
 | `skillstore list` | List installed |
-| `skillstore known` | Show known skills |
+| `skillstore known` | Show all known skills |
 | `skillstore create <name>` | New skill |
 
-## What It Does
+## Configuration
 
-**Before Creating**: Searches GitHub for existing solutions
-
-**If Found**: Offers to install existing
-
-**If Not Found**: Offers to create new
-
-This prevents duplicate work and helps discover existing skills.
-
-## Known Skills
-
-Built-in list of popular OpenClaw skills:
-- homeassistant - Smart home control
-- gog - Google Workspace
-- weather - Weather forecasts
-- github - GitHub CLI
-- And more...
-
-Run `skillstore known` to see full list.
+- **Threshold**: 30% (configurable in code)
+- **Search Sources**: Known → Local → GitHub
+- **Deduplication**: Keeps highest score duplicate
 
 ## Files
 
@@ -89,7 +84,7 @@ Run `skillstore known` to see full list.
 skillstore/
 ├── SKILL.md       # OpenClaw docs
 ├── README.md      # This file
-├── main.js        # CLI
+├── main.js        # CLI with matching
 └── config.json   # Install history
 ```
 
