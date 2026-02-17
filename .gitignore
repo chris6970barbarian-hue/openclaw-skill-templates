@@ -1,0 +1,9 @@
+# Ignore sensitive files
+config.json
+*.token
+*.key
+*.pem
+.env
+.env.local
+node_modules/
+.DS_Store
