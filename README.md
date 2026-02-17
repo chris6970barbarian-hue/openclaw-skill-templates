@@ -1,65 +1,96 @@
-# Skill Templates for OpenClaw
+# SkillStore - OpenClaw Skill Manager
 
-A template generator and guidelines reference for developing OpenClaw skills.
+Search, install, and create OpenClaw skills with one command.
+
+## Features
+
+- Smart GitHub search before creating new skills
+- One-command install from GitHub
+- Local skill search
+- Template-based skill creation
+- Known skills catalog
 
 ## Quick Start
 
 ```bash
-# Show all guidelines
-skill-template guidelines
+# Search and install
+skillstore home assistant
+skillstore weather
 
-# Show project structure
-skill-template structure
+# List skills
+skillstore list
+skillstore known
 
-# Create new skill
-skill-template new my-awesome-skill
+# Create new
+skillstore create my-skill
 ```
 
-## Features
+## Workflow
 
-- Project structure templates
-- Config template
-- SKILL.md / README.md templates
-- .gitignore template
-- Development guidelines reference
+### 1. Search
+```bash
+skillstore home assistant
+```
+
+Automatically:
+- Searches GitHub for "openclaw home assistant"
+- Searches local workspace
+
+### 2. Choose Action
+```
+Results:
+1. [GIT] openclaw-homeassistant - Control smart home devices
+2. [LOCAL] homeassistant - Your local version
+
+Options:
+  [1] Install from GitHub
+  [n] Create new skill
+  [q] Quit
+```
+
+### 3. Install or Create
+
+- **Install**: Downloads from GitHub to your skills folder
+- **Create**: Generates templates in new folder
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `skill-template structure` | Show standard project structure |
-| `skill-template config` | Show config.json template |
-| `skill-template gitignore` | Show .gitignore template |
-| `skill-template guidelines` | Show development guidelines |
-| `skill-template new <name>` | Create new skill with all templates |
+| `skillstore <query>` | Search for skills |
+| `skillstore list` | List installed |
+| `skillstore known` | Show known skills |
+| `skillstore create <name>` | New skill |
 
-## Development Guidelines
+## What It Does
 
-See [guidelines.md](./guidelines.md) for the full list.
+**Before Creating**: Searches GitHub for existing solutions
 
-### Core Principles
+**If Found**: Offers to install existing
 
-1. **保证程序的可用性和鲁棒性** - Ensure program works reliably
-2. **尽量优化交互体验** - Optimize user experience
-3. **在用户设置错误时有可靠简单的回退选项** - Provide fallback for misconfiguration
-4. **能让用户通过一次输入就解决的事情不要拖两次** - One-input solutions
-5. **记住这个 -> 写在 markdown 文件里**
+**If Not Found**: Offers to create new
 
-### Configuration Rules
+This prevents duplicate work and helps discover existing skills.
 
-- Never change openclaw.json without permission
-- Show planned changes before applying
-- NO emoji in output
+## Known Skills
 
-### Standard Structure
+Built-in list of popular OpenClaw skills:
+- homeassistant - Smart home control
+- gog - Google Workspace
+- weather - Weather forecasts
+- github - GitHub CLI
+- And more...
+
+Run `skillstore known` to see full list.
+
+## Files
 
 ```
-skill-name/
-├── SKILL.md         # OpenClaw skill docs
-├── README.md        # User docs
-├── main             # Main executable
-├── config.json      # Config template
-└── .gitignore       # Ignore secrets
+skillstore/
+├── SKILL.md       # OpenClaw docs
+├── README.md      # This file
+├── main.js        # CLI
+└── config.json   # Install history
 ```
 
 ## License

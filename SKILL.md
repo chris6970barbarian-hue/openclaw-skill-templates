@@ -1,60 +1,95 @@
-# Skill Templates
+# SkillStore - OpenClaw Skill Manager
 
-A collection of templates and guidelines for developing OpenClaw skills.
+Search, install, and create OpenClaw skills. Automatically searches GitHub for existing skills before creating new ones.
 
-## Overview
+## Features
 
-This skill provides templates and best practices for creating new OpenClaw skills. It helps maintain consistency across all skills and ensures high-quality implementations.
+- **Smart Search** - Searches GitHub for existing skills first
+- **Local Search** - Finds skills in your workspace
+- **One-command Install** - Install from GitHub with one command
+- **Template Generator** - Create new skills with templates
+- **Known Skills** - Lists all known OpenClaw skills
 
-## Usage
+## Quick Start
 
 ```bash
-# Generate a new skill template
-skill-template new my-awesome-skill
+# Search for a skill
+skillstore home assistant
+skillstore weather
+skillstore github
 
-# Show structure template
-skill-template structure
+# List installed skills
+skillstore list
 
-# Show config template
-skill-template config
+# Show known skills
+skillstore known
+
+# Create new skill
+skillstore create my-awesome-skill
 ```
 
-## What's Included
+## How It Works
 
-### Templates
+1. **Search Phase**: When you search for a skill, it automatically:
+   - Searches GitHub for matching repositories
+   - Searches your local skills
 
-- **Project Structure** - Standard layout for OpenClaw skills
-- **SKILL.md** - Template for OpenClaw skill documentation
-- **README.md** - Template for user-facing documentation
-- **config.json** - Configuration template
+2. **Results Phase**: Shows all matches:
+   - Local skills (green)
+   - GitHub repositories (cyan)
 
-### Guidelines Reference
+3. **Action Phase**: Choose to:
+   - Install from GitHub (enter number)
+   - Create new skill (type 'n')
+   - Quit (type 'q')
 
-See `guidelines.md` for the full list of principles and rules to follow.
+## Usage Examples
 
-## Quick Reference
+```bash
+# Find weather skills
+skillstore weather
 
-### Core Principles
+# Find GitHub integration
+skillstore github
 
-1. Program availability and robustness
-2. Optimize user experience
-3. Provide fallback for misconfiguration
-4. One-input solutions (never make user type twice)
-5. Write down "记住这个" in markdown
+# Find smart home skills
+skillstore "home assistant"
+skillstore hue
+skillstore smart
 
-### Configuration Rules
+# Create new
+skillstore create my-skill
+```
 
-- Never change openclaw.json without permission
-- Show planned changes before applying
-- NO emoji in output
+## Commands
 
-### Project Structure
+| Command | Description |
+|---------|-------------|
+| `skillstore Search for skills |
+| `skillstore <query>` | list` | List installed skills |
+| `skillstore known Open` | Show knownClaw skills |
+| `skillstore create <name>` | Create new skill |
+
+## Search Flow
 
 ```
-skill-name/
-├── SKILL.md         # OpenClaw skill docs
-├── README.md        # User docs
-├── main             # Main executable
-├── config.json      # Config template
-└── .gitignore      # Ignore secrets
+1. User: "skillstore weather"
+2. System searches GitHub for "openclaw weather"
+3. System searches local skills
+4. Shows results (local + GitHub)
+5. User chooses: install / create new / quit
+```
+
+## Configuration
+
+Config saved to `config.json` in skill folder.
+
+## Files
+
+```
+skillstore/
+├── SKILL.md       # OpenClaw skill docs
+├── README.md      # This file
+├── main.js        # Main CLI
+└── config.json   # Saved installations
 ```
